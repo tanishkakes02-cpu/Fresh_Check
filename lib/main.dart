@@ -1,0 +1,416 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(FreshCheckApp());
+}
+
+class FreshCheckApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'FreshCheck',
+      theme: ThemeData.dark(),
+      home: SplashScreen(),
+    );
+  }
+}
+
+// 🌟 Splash Screen
+class SplashScreen extends StatefulWidget {
+  @override
+  _SplashScreenState createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: Duration(seconds: 2));
+    _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _controller.forward();
+    Future.delayed(Duration(seconds: 3), () {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomeScreen()));
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Color(0xFF1A1A2E),
+      body: FadeTransition(
+        opacity: _fadeAnim,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.cyanAccent.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.verified_rounded, size: 80, color: Colors.cyanAccent),
+              ),
+              SizedBox(height: 24),
+              Text('FreshCheck', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.cyanAccent, letterSpacing: 2)),
+              SizedBox(height: 8),
+              Text('Never let anything expire again', style: TextStyle(color: Colors.white54, fontSize: 14)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// 📦 Item Model
+class Item {
+  String name;
+  DateTime expiryDate;
+  String category;
+
+  Item({required this.name, required this.expiryDate, required this.category});
+
+  int get daysLeft => expiryDate.difference(DateTime.now()).inDays;
+
+  Color get statusColor {
+    if (daysLeft < 0) return Colors.red;
+    if (daysLeft <= 3) return Colors.orange;
+    if (daysLeft <= 7) return Colors.yellow;
+    return Colors.green;
+  }
+
+  String get statusText {
+    if (daysLeft < 0) return 'Expired!';
+    if (daysLeft == 0) return 'Expires Today!';
+    if (daysLeft == 1) return '1 day left';
+    return '$daysLeft days left';
+  }
+
+  IconData get icon {
+    switch (category) {
+      case 'Food': return Icons.fastfood;
+      case 'Medicine': return Icons.medical_services;
+      case 'Document': return Icons.description;
+      case 'Cosmetics': return Icons.face;
+      case 'Dairy': return Icons.egg;
+      default: return Icons.category;
+    }
+  }
+}
+
+// 🏠 Home Screen
+class HomeScreen extends StatefulWidget {
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<Item> items = [
+    Item(name: 'Milk', expiryDate: DateTime.now().add(Duration(days: 2)), category: 'Dairy'),
+    Item(name: 'Paracetamol', expiryDate: DateTime.now().add(Duration(days: 10)), category: 'Medicine'),
+    Item(name: 'Passport', expiryDate: DateTime.now().add(Duration(days: 300)), category: 'Document'),
+    Item(name: 'Sunscreen', expiryDate: DateTime.now().subtract(Duration(days: 1)), category: 'Cosmetics'),
+  ];
+
+  String selectedFilter = 'All';
+  final List<String> filters = ['All', 'Expired', 'This Week', 'Safe'];
+  final List<String> categories = ['Food', 'Medicine', 'Document', 'Cosmetics', 'Dairy', 'Other'];
+
+  final nameController = TextEditingController();
+  String selectedCategory = 'Food';
+  DateTime selectedDate = DateTime.now().add(Duration(days: 1));
+
+  List<Item> get filteredItems {
+    List<Item> sorted = [...items]..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
+    switch (selectedFilter) {
+      case 'Expired': return sorted.where((i) => i.daysLeft < 0).toList();
+      case 'This Week': return sorted.where((i) => i.daysLeft >= 0 && i.daysLeft <= 7).toList();
+      case 'Safe': return sorted.where((i) => i.daysLeft > 7).toList();
+      default: return sorted;
+    }
+  }
+
+  int get expiredCount => items.where((i) => i.daysLeft < 0).length;
+  int get soonCount => items.where((i) => i.daysLeft >= 0 && i.daysLeft <= 7).length;
+  int get safeCount => items.where((i) => i.daysLeft > 7).length;
+
+  void addItem() {
+    if (nameController.text.isEmpty) return;
+    setState(() {
+      items.add(Item(name: nameController.text, expiryDate: selectedDate, category: selectedCategory));
+      nameController.clear();
+      selectedDate = DateTime.now().add(Duration(days: 1));
+      selectedCategory = 'Food';
+    });
+    Navigator.pop(context);
+  }
+
+  void deleteItem(int index) {
+    final actual = items.indexOf(filteredItems[index]);
+    setState(() => items.removeAt(actual));
+  }
+
+  void showAddDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Color(0xFF2A2A3E),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(left: 20, right: 20, top: 24, bottom: MediaQuery.of(context).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.add_circle, color: Colors.cyanAccent),
+                  SizedBox(width: 8),
+                  Text('Add New Item', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                ],
+              ),
+              SizedBox(height: 20),
+              TextField(
+                controller: nameController,
+                style: TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Item Name',
+                  prefixIcon: Icon(Icons.label_outline, color: Colors.cyanAccent),
+                  labelStyle: TextStyle(color: Colors.white54),
+                  filled: true,
+                  fillColor: Colors.white10,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+              ),
+              SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedCategory,
+                dropdownColor: Color(0xFF2A2A3E),
+                style: TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Category',
+                  prefixIcon: Icon(Icons.category_outlined, color: Colors.cyanAccent),
+                  labelStyle: TextStyle(color: Colors.white54),
+                  filled: true,
+                  fillColor: Colors.white10,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+                items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                onChanged: (val) => setModalState(() => selectedCategory = val!),
+              ),
+              SizedBox(height: 12),
+              ListTile(
+                tileColor: Colors.white10,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                leading: Icon(Icons.calendar_today, color: Colors.cyanAccent),
+                title: Text(
+                  'Expiry: ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate,
+                    firstDate: DateTime.now().subtract(Duration(days: 365)),
+                    lastDate: DateTime.now().add(Duration(days: 3650)),
+                  );
+                  if (picked != null) setModalState(() => selectedDate = picked);
+                },
+              ),
+              SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: Icon(Icons.check, color: Colors.black),
+                  label: Text('Add Item', style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.cyanAccent,
+                    padding: EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: addItem,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Color(0xFF1A1A2E),
+      appBar: AppBar(
+        backgroundColor: Color(0xFF1A1A2E),
+        elevation: 0,
+        title: Row(
+          children: [
+            Icon(Icons.verified_rounded, color: Colors.cyanAccent, size: 26),
+            SizedBox(width: 8),
+            Text('FreshCheck', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Colors.cyanAccent)),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Center(child: Text('${items.length} items', style: TextStyle(color: Colors.white54))),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // 📊 Summary Cards
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                _summaryCard('Expired', expiredCount, Colors.red),
+                SizedBox(width: 10),
+                _summaryCard('Expiring Soon', soonCount, Colors.orange),
+                SizedBox(width: 10),
+                _summaryCard('Safe', safeCount, Colors.green),
+              ],
+            ),
+          ),
+          // 🔘 Filter Chips
+          SizedBox(
+            height: 50,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              children: filters.map((f) {
+                final selected = selectedFilter == f;
+                return Padding(
+                  padding: EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(f, style: TextStyle(color: selected ? Colors.black : Colors.white70)),
+                    selected: selected,
+                    onSelected: (_) => setState(() => selectedFilter = f),
+                    selectedColor: Colors.cyanAccent,
+                    backgroundColor: Color(0xFF2A2A3E),
+                    checkmarkColor: Colors.black,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          SizedBox(height: 8),
+          // 📋 Item List
+          Expanded(
+            child: filteredItems.isEmpty
+                ? Center(child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.inbox_outlined, size: 60, color: Colors.white24),
+                      SizedBox(height: 12),
+                      Text('No items here!', style: TextStyle(color: Colors.white38, fontSize: 16)),
+                    ],
+                  ))
+                : ListView.builder(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: filteredItems.length,
+                    itemBuilder: (_, index) {
+                      final item = filteredItems[index];
+                      return Container(
+                        margin: EdgeInsets.only(bottom: 12),
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Color(0xFF2A2A3E),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: item.statusColor.withOpacity(0.4), width: 1.5),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: item.statusColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(item.icon, color: item.statusColor, size: 26),
+                            ),
+                            SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  SizedBox(height: 4),
+                                  Text(item.category, style: TextStyle(color: Colors.white54, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: item.statusColor.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(item.statusText, style: TextStyle(color: item.statusColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  '${item.expiryDate.day}/${item.expiryDate.month}/${item.expiryDate.year}',
+                                  style: TextStyle(color: Colors.white38, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                            SizedBox(width: 4),
+                            IconButton(
+                              icon: Icon(Icons.delete_outline, color: Colors.red.shade300, size: 20),
+                              onPressed: () => deleteItem(index),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: Colors.cyanAccent,
+        icon: Icon(Icons.add, color: Colors.black),
+        label: Text('Add Item', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        onPressed: showAddDialog,
+      ),
+    );
+  }
+
+  Widget _summaryCard(String label, int count, Color color) {
+    return Expanded(
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            Text('$count', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+            SizedBox(height: 4),
+            Text(label, style: TextStyle(color: Colors.white54, fontSize: 10), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+}
